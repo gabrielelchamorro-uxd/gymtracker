@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>GymTracker · Treinador</title>
+<style>
+:root {
+  --bg:#0f0f0f; --surface:#1a1a1a; --surface2:#222; --surface3:#2a2a2a;
+  --border:#2e2e2e; --accent:#6366f1; --accent-dim:rgba(99,102,241,0.15);
+  --text:#f1f5f9; --text2:#94a3b8; --text3:#64748b;
+  --danger:#ef4444; --success:#22c55e; --radius:12px; --radius-sm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{font-family:-apple-system,'Inter',sans-serif;background:var(--bg);color:var(--text);display:flex;flex-direction:column;max-width:600px;margin:0 auto}
+
+/* LOGIN */
+#loginScreen{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:32px;gap:20px}
+.login-logo{width:64px;height:64px;background:var(--accent);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:8px}
+.login-title{font-size:22px;font-weight:700}
+.login-sub{font-size:14px;color:var(--text3);text-align:center}
+.login-input{width:100%;max-width:320px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:15px;padding:13px 16px;outline:none;text-align:center;letter-spacing:4px;font-family:inherit;transition:border-color 0.2s}
+.login-input:focus{border-color:var(--accent)}
+.login-btn{width:100%;max-width:320px;padding:13px;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:all 0.15s}
+.login-btn:hover{opacity:0.9}
+.login-err{color:var(--danger);font-size:13px;display:none}
+.login-err.show{display:block}
+
+/* APP */
+#appScreen{display:none;flex-direction:column;height:100%}
+#appScreen.visible{display:flex}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0}
+.topbar-logo{display:flex;align-items:center;gap:8px;font-weight:700;font-size:17px}
+.logo-icon{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.trainer-badge{background:var(--accent-dim);border:1px solid var(--accent);border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;color:var(--accent);letter-spacing:1px}
+.sync-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3)}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--text3)}
+.sync-dot.ok{background:var(--success)}
+.sync-dot.err{background:var(--danger)}
+
+.content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.content::-webkit-scrollbar{width:0}
+.page{display:none;padding:16px}
+.page.active{display:block}
+
+.bottom-nav{display:flex;border-top:1px solid var(--border);background:var(--bg);flex-shrink:0}
+.bnav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 0 12px;border:none;background:transparent;color:var(--text3);font-size:10px;font-weight:600;cursor:pointer;transition:color 0.2s;letter-spacing:0.3px}
+.bnav-btn svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
+.bnav-btn.active{color:var(--accent)}
+
+/* SEÇÕES */
+.section-title{font-size:11px;font-weight:700;letter-spacing:2px;color:var(--text3);margin-bottom:10px;text-transform:uppercase}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden}
+.card-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer}
+.card-body{display:none;border-top:1px solid var(--border);padding:14px 16px}
+.card-body.open{display:block}
+
+/* treino cards */
+.treino-badge{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;flex-shrink:0}
+.card-title-row{display:flex;align-items:center;gap:10px;flex:1}
+.card-name{font-weight:700;font-size:15px}
+.card-sub{font-size:12px;color:var(--text3);margin-top:2px}
+
+/* edição inline */
+.edit-input{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:6px 10px;outline:none;transition:border-color 0.2s;font-family:inherit}
+.edit-input:focus{border-color:var(--accent)}
+.edit-nome{flex:1;min-width:80px}
+.edit-num{width:46px;text-align:center}
+.ex-edit-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)}
+.ex-edit-row:last-of-type{border-bottom:none}
+.btn-sm{padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text3);font-size:12px;cursor:pointer;font-family:inherit;transition:all 0.2s}
+.btn-sm:hover{border-color:var(--accent);color:var(--accent)}
+.btn-sm.danger:hover{border-color:var(--danger);color:var(--danger)}
+.btn-save{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-save:hover{opacity:0.9;color:#fff}
+
+/* histórico */
+.hist-filter{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.hist-chip{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text3);font-size:12px;font-weight:600;cursor:pointer;transition:all 0.15s;font-family:inherit}
+.hist-chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.hist-card-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer}
+.hist-card-left{display:flex;align-items:center;gap:10px}
+.hist-badge{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;flex-shrink:0}
+.hist-info-name{font-weight:700;font-size:14px}
+.hist-info-sub{font-size:12px;color:var(--text3);margin-top:2px}
+.hist-duration{font-family:'Courier New',monospace;font-size:13px;color:var(--text2)}
+.hist-ex-row{padding:8px 0;border-bottom:1px solid var(--border)}
+.hist-ex-row:last-of-type{border-bottom:none}
+.hist-ex-name{font-size:13px;font-weight:600}
+.hist-ex-detail{font-size:12px;color:var(--text3);margin-top:3px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.hist-carga{color:var(--success);font-weight:600}
+
+/* evolução */
+.evo-section{margin-top:16px}
+.evo-title{font-size:12px;font-weight:700;letter-spacing:1px;color:var(--text3);margin-bottom:10px;text-transform:uppercase}
+.evo-card{background:var(--surface2);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px}
+.evo-ex-name{font-weight:700;font-size:13px;margin-bottom:8px}
+.chart-wrap{width:100%;height:140px;background:var(--surface3);border-radius:8px;overflow:hidden;margin-bottom:6px}
+.chart-wrap canvas{display:block}
+.evo-table{width:100%;border-collapse:collapse;font-size:11px}
+.evo-table th{color:var(--text3);font-size:10px;text-align:left;padding:4px 6px;border-bottom:1px solid var(--border)}
+.evo-table td{padding:5px 6px;border-bottom:1px solid var(--border);font-family:'Courier New',monospace}
+.evo-table tr:last-child td{border-bottom:none}
+.td-kg{color:var(--success);font-weight:700}
+.td-up{color:var(--success)}
+.td-down{color:var(--danger)}
+
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;color:var(--text3);text-align:center;gap:10px}
+.empty-state svg{width:48px;height:48px;stroke:var(--text3);fill:none;stroke-width:1.5}
+
+.loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--text3);gap:10px;font-size:14px}
+.spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--accent);border-radius:var(--radius-sm);padding:10px 20px;font-size:13px;font-weight:600;z-index:500;display:none;animation:fadeIn 0.2s}
+.toast.show{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(-8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-logo">🏋️</div>
+  <div class="login-title">GymTracker</div>
+  <div class="login-sub">Acesso do Treinador</div>
+  <input class="login-input" id="senhaInput" type="password" placeholder="Senha" onkeydown="if(event.key==='Enter')entrar()">
+  <div class="login-err" id="loginErr">Senha incorreta.</div>
+  <button class="login-btn" onclick="entrar()">Entrar</button>
+</div>
+
+<!-- APP -->
+<div id="appScreen">
+  <div class="topbar">
+    <div class="topbar-logo">
+      <div class="logo-icon">🏋️</div>
+      GymTracker
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="sync-row"><div class="sync-dot" id="syncDot"></div><span id="syncTxt">carregando</span></div>
+      <div class="trainer-badge">TREINADOR</div>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- TREINOS -->
+    <div class="page active" id="page-treinos">
+      <div class="section-title" style="margin-bottom:14px">Treinos da Aluna</div>
+      <div id="treinosList"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
+    </div>
+
+    <!-- HISTÓRICO -->
+    <div class="page" id="page-hist">
+      <div class="hist-filter" id="histFilter"></div>
+      <div id="histList"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
+    </div>
+
+    <!-- EVOLUÇÃO -->
+    <div class="page" id="page-evo">
+      <div class="section-title" style="margin-bottom:14px">Evolução de Cargas</div>
+      <div id="evoList"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="bnav-btn active" id="bnav-treinos" onclick="goPage('treinos')">
+      <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>Treinos
+    </button>
+    <button class="bnav-btn" id="bnav-hist" onclick="goPage('hist')">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Histórico
+    </button>
+    <button class="bnav-btn" id="bnav-evo" onclick="goPage('evo')">
+      <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 9l-5-5-4 4-3-3"/></svg>Evolução
+    </button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ───────────────────────────────────────────────────────────────────
+const SENHA = 'treinador123'; // ← altere aqui
+// SUPABASE CONFIG
+const SB_URL = 'https://jpauuwaxqyxydlbylrir.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpwYXV1d2F4cXl4eWRsYnlscmlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcyMzU5NDMsImV4cCI6MjEwMjgxMTk0M30._H716vtYIE97G31vOETMHRMmAOvx9_BNX9EPZFjHCPM';
+
+// ── LOGIN ────────────────────────────────────────────────────────────────────
+function entrar() {
+  const v = document.getElementById('senhaInput').value;
+  if (v !== SENHA) { document.getElementById('loginErr').classList.add('show'); return; }
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appScreen').classList.add('visible');
+  iniciarApp();
+}
+
+// ── SUPABASE ─────────────────────────────────────────────────────────────────
+async function sbFetch(path, opts={}) {
+  const headers = {
+    'apikey': SB_KEY,
+    'Authorization': 'Bearer ' + SB_KEY,
+    'Content-Type': 'application/json',
+    ...(opts.headers||{})
+  };
+  if (opts.method && ['POST','PATCH'].includes(opts.method)) {
+    headers['Prefer'] = opts.prefer || 'return=representation';
+  }
+  const res = await fetch(SB_URL+'/rest/v1/'+path, { ...opts, headers });
+  if (!res.ok) {
+    const e = await res.text();
+    console.error('sbFetch error', res.status, e);
+    throw new Error(res.status + ': ' + e);
+  }
+  const txt = await res.text();
+  return txt ? JSON.parse(txt) : null;
+}
+
+function setSyncStatus(s) {
+  const d=document.getElementById('syncDot'), t=document.getElementById('syncTxt');
+  if(s==='ok'){d.className='sync-dot ok';t.textContent='sincronizado';}
+  if(s==='err'){d.className='sync-dot err';t.textContent='sem conexão';}
+  if(s==='loading'){d.className='sync-dot';t.textContent='carregando';}
+}
+
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2500);
+}
+
+// ── PALETA ───────────────────────────────────────────────────────────────────
+const PALETTE=[
+  {bg:'#166534',color:'#4ade80'},{bg:'#1e3a5f',color:'#60a5fa'},
+  {bg:'#7c2d12',color:'#fb923c'},{bg:'#4a1d96',color:'#c084fc'},
+  {bg:'#831843',color:'#f472b6'},{bg:'#134e4a',color:'#2dd4bf'},
+  {bg:'#713f12',color:'#fbbf24'},{bg:'#1e1b4b',color:'#818cf8'},
+];
+let treinoKeys = [];
+function getColor(k) { return PALETTE[treinoKeys.indexOf(k)%PALETTE.length]||PALETTE[0]; }
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+let treinos={}, historico=[];
+let histFiltro='TODOS', paginaAtual='treinos';
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+async function iniciarApp() {
+  setSyncStatus('loading');
+  try {
+    const [tr, hi] = await Promise.all([
+      sbFetch('treinos?order=letra'),
+      sbFetch('historico?order=created_at.desc')
+    ]);
+    treinos={};
+    (tr||[]).forEach(r=>{ treinos[r.letra]={id:r.id,nome:r.nome,exercicios:r.exercicios}; });
+    treinoKeys=Object.keys(treinos);
+    historico=(hi||[]).map(r=>({id:r.id,data:r.data,treino:r.treino,nomeT:r.nome_t,duracao:r.duracao,laps:r.laps,exercicios:r.exercicios}));
+    setSyncStatus('ok');
+  } catch(e) { setSyncStatus('err'); }
+  renderTreinos();
+}
+
+// ── NAVEGAÇÃO ────────────────────────────────────────────────────────────────
+function goPage(p) {
+  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  document.querySelectorAll('.bnav-btn').forEach((b,i)=>b.classList.toggle('active',['treinos','hist','evo'][i]===p));
+  paginaAtual=p;
+  if(p==='treinos') renderTreinos();
+  if(p==='hist') renderHistorico();
+  if(p==='evo') renderEvolucao();
+}
+
+function fmt(s){return[Math.floor(s/3600),Math.floor((s%3600)/60),s%60].map(v=>String(v).padStart(2,'0')).join(':');}
+function esc(s){return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
+
+// ── TREINOS (edição) ──────────────────────────────────────────────────────────
+function renderTreinos() {
+  const el=document.getElementById('treinosList');
+  const keys=Object.keys(treinos);
+  if(!keys.length){el.innerHTML=`<div class="empty-state"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg><p>Nenhum treino cadastrado ainda.</p></div>`;return;}
+  el.innerHTML=keys.map(k=>{
+    const t=treinos[k],c=getColor(k);
+    return `<div class="card">
+      <div class="card-header" onclick="toggleCard('tc-${k}')">
+        <div class="card-title-row">
+          <div class="treino-badge" style="background:${c.bg};color:${c.color}">${k}</div>
+          <div>
+            <div class="card-name">${t.nome}</div>
+            <div class="card-sub">${t.exercicios.length} exercício${t.exercicios.length!==1?'s':''}</div>
+          </div>
+        </div>
+        <span style="color:var(--text3)">▾</span>
+      </div>
+      <div class="card-body" id="tc-${k}">
+        <div style="margin-bottom:12px">
+          <label style="font-size:11px;color:var(--text3);letter-spacing:1px">NOME DO TREINO</label>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <input class="edit-input edit-nome" id="tnome-${k}" value="${t.nome}" placeholder="Nome">
+            <button class="btn-sm btn-save" onclick="salvarNomeTreino('${k}')">Salvar</button>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text3);letter-spacing:1px;margin-bottom:8px">EXERCÍCIOS</div>
+        ${t.exercicios.map((ex,i)=>`
+        <div class="ex-edit-row" id="exrow-${k}-${i}">
+          <input class="edit-input edit-nome" value="${ex.nome}" onchange="treinos['${k}'].exercicios[${i}].nome=this.value">
+          <input class="edit-input edit-num" type="number" min="1" value="${ex.series}" onchange="treinos['${k}'].exercicios[${i}].series=+this.value">
+          <span style="color:var(--text3);font-size:12px">×</span>
+          <input class="edit-input edit-num" type="number" min="1" value="${ex.reps}" onchange="treinos['${k}'].exercicios[${i}].reps=+this.value">
+          <button class="btn-sm danger" onclick="deleteExTr('${k}',${i})" title="Remover">✕</button>
+        </div>
+        <div style="padding:0 0 8px">
+          <input class="edit-input" style="width:100%;font-size:12px" placeholder="Instruções (opcional)" value="${ex.instrucoes||''}" onchange="treinos['${k}'].exercicios[${i}].instrucoes=this.value">
+        </div>`).join('')}
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn-sm" onclick="addExTr('${k}')">+ Exercício</button>
+          <button class="btn-sm btn-save" onclick="salvarExercicios('${k}')">💾 Salvar exercícios</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleCard(id) { document.getElementById(id)?.classList.toggle('open'); }
+
+async function salvarNomeTreino(k) {
+  const nome=document.getElementById(`tnome-${k}`).value.trim();
+  if(!nome) return;
+  treinos[k].nome=nome;
+  await sbFetch(`treinos?id=eq.${treinos[k].id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({nome})});
+  showToast('Nome salvo ✓');
+  renderTreinos(); document.getElementById(`tc-${k}`).classList.add('open');
+}
+
+async function salvarExercicios(k) {
+  await sbFetch(`treinos?id=eq.${treinos[k].id}`,{method:'PATCH',prefer:'return=minimal',body:JSON.stringify({exercicios:treinos[k].exercicios})});
+  showToast('Exercícios salvos ✓');
+  setSyncStatus('ok');
+}
+
+function addExTr(k) {
+  treinos[k].exercicios.push({nome:'Novo exercício',series:3,reps:12});
+  renderTreinos(); document.getElementById(`tc-${k}`).classList.add('open');
+}
+
+function deleteExTr(k,i) {
+  if(!confirm('Remover exercício?')) return;
+  treinos[k].exercicios.splice(i,1);
+  renderTreinos(); document.getElementById(`tc-${k}`).classList.add('open');
+}
+
+// ── HISTÓRICO ────────────────────────────────────────────────────────────────
+function renderHistorico() {
+  const el=document.getElementById('histList'), fEl=document.getElementById('histFilter');
+  if(!historico.length){
+    fEl.innerHTML='';
+    el.innerHTML=`<div class="empty-state"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><p>Nenhum treino registrado ainda.</p></div>`;
+    return;
+  }
+  const keys=['TODOS',...new Set(historico.map(h=>h.treino))];
+  fEl.innerHTML=keys.map(k=>`<button class="hist-chip ${histFiltro===k?'active':''}" onclick="setHistFiltro('${k}')">${k==='TODOS'?'Todos':'Treino '+k}</button>`).join('');
+  const lista=histFiltro==='TODOS'?historico:historico.filter(h=>h.treino===histFiltro);
+  if(!lista.length){el.innerHTML=`<div class="empty-state"><p>Sem registros.</p></div>`;return;}
+  el.innerHTML=lista.map(h=>{
+    const idx=historico.indexOf(h),c=getColor(h.treino);
+    return `<div class="card">
+      <div class="hist-card-header" onclick="toggleCard('hb-${idx}')">
+        <div class="hist-card-left">
+          <div class="hist-badge" style="background:${c.bg};color:${c.color}">${h.treino}</div>
+          <div><div class="hist-info-name">${h.nomeT||'Treino '+h.treino}</div><div class="hist-info-sub">${h.data}</div></div>
+        </div>
+        <div class="hist-duration">${fmt(h.duracao)}</div>
+      </div>
+      <div class="card-body" id="hb-${idx}">
+        ${h.exercicios.map(ex=>{
+          const prev=encontrarCargaAnterior(h,ex.nome);
+          let dHtml='';
+          if(ex.carga&&prev!==null){const d=parseFloat(ex.carga)-prev;if(d>0)dHtml=`<span class="td-up" style="font-size:11px">▲${d}kg</span>`;else if(d<0)dHtml=`<span class="td-down" style="font-size:11px">▼${Math.abs(d)}kg</span>`;}
+          return `<div class="hist-ex-row">
+            <div class="hist-ex-name">${ex.done?'✓ ':''}${ex.nome} <span style="color:var(--text3);font-weight:400;font-size:12px">${ex.series}×${ex.reps}</span></div>
+            <div class="hist-ex-detail">${ex.carga?`<span class="hist-carga">${ex.carga}kg</span>`:''} ${dHtml} ${ex.obs?`<span>${ex.obs}</span>`:''}</div>
+          </div>`;
+        }).join('')}
+        ${h.laps?.length?`<div style="margin-top:10px;padding:8px;background:var(--surface2);border-radius:6px;font-family:'Courier New',monospace;font-size:11px;color:var(--text3)">${h.laps.map((l,i)=>`#${i+1}: ${fmt(l.total)} (Δ${fmt(l.delta)})`).join('  ·  ')}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setHistFiltro(k){histFiltro=k;renderHistorico();}
+function encontrarCargaAnterior(hAtual,nomeEx){
+  const idx=historico.indexOf(hAtual);
+  for(let i=idx+1;i<historico.length;i++){const h=historico[i];if(h.treino!==hAtual.treino)continue;const ex=h.exercicios.find(e=>e.nome===nomeEx);if(ex&&ex.carga&&parseFloat(ex.carga)>0)return parseFloat(ex.carga);}
+  return null;
+}
+
+// ── EVOLUÇÃO ─────────────────────────────────────────────────────────────────
+function renderEvolucao() {
+  const el=document.getElementById('evoList');
+  if(!historico.length){el.innerHTML=`<div class="empty-state"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 9l-5-5-4 4-3-3"/></svg><p>Nenhum dado ainda.</p></div>`;return;}
+
+  // agrupa por exercício por treino
+  const mapa={}; // { 'A::Leg Press': [{data,kg},...] }
+  for(let i=historico.length-1;i>=0;i--){
+    const h=historico[i];
+    h.exercicios.forEach(ex=>{
+      if(!ex.carga||parseFloat(ex.carga)<=0) return;
+      const key=`${h.treino}::${ex.nome}`;
+      if(!mapa[key]) mapa[key]={treino:h.treino,nome:ex.nome,dados:[]};
+      mapa[key].dados.push({data:h.data,kg:parseFloat(ex.carga)});
+    });
+  }
+
+  const keys=Object.keys(mapa);
+  if(!keys.length){el.innerHTML=`<div class="empty-state"><p>Nenhum exercício com carga registrada.</p></div>`;return;}
+
+  // agrupar por treino
+  const porTreino={};
+  keys.forEach(k=>{const t=mapa[k].treino;if(!porTreino[t])porTreino[t]=[];porTreino[t].push(mapa[k]);});
+
+  el.innerHTML=Object.keys(porTreino).map(tk=>{
+    const c=getColor(tk);
+    return `<div style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div style="width:28px;height:28px;border-radius:6px;background:${c.bg};color:${c.color};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px">${tk}</div>
+        <div style="font-size:13px;font-weight:700">${treinos[tk]?.nome||'Treino '+tk}</div>
+      </div>
+      ${porTreino[tk].map((item,evoIdx)=>{
+        const uid=`evo-${tk}-${evoIdx}`;
+        const dados=item.dados;
+        const max=dados.length?dados[dados.length-1].kg:0;
+        const first=dados[0]?.kg||0;
+        const delta=max-first;
+        const deltaHtml=delta>0?`<span class="td-up">▲${delta}kg</span>`:delta<0?`<span class="td-down">▼${Math.abs(delta)}kg</span>`:'—';
+        return `<div class="evo-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div class="evo-ex-name" style="margin-bottom:0">${item.nome}</div>
+            <div style="font-size:12px;color:var(--text3)">${dados.length} sessão${dados.length!==1?'ões':''} · ${deltaHtml}</div>
+          </div>
+          <div class="chart-wrap" id="${uid}-wrap"><canvas id="${uid}-canvas"></canvas></div>
+          <table class="evo-table"><thead><tr><th>DATA</th><th>CARGA</th><th>Δ</th></tr></thead><tbody>
+            ${dados.map((d,i)=>{const prev=i>0?dados[i-1].kg:null,delta2=prev!==null?d.kg-prev:null;const dh=delta2===null?'—':delta2>0?`<span class="td-up">▲${delta2}kg</span>`:delta2<0?`<span class="td-down">▼${Math.abs(delta2)}kg</span>`:'—';return`<tr><td>${d.data}</td><td class="td-kg">${d.kg}kg</td><td>${dh}</td></tr>`;}).join('')}
+          </tbody></table>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }).join('');
+
+  // desenhar gráficos
+  keys.forEach((k,evoIdx)=>{
+    const item=mapa[k],tk=item.treino;
+    const localIdx=porTreino[tk].indexOf(item);
+    const uid=`evo-${tk}-${localIdx}`;
+    setTimeout(()=>desenharMini(item.dados,getColor(tk).color,`${uid}-canvas`,`${uid}-wrap`),80);
+  });
+}
+
+function desenharMini(dados,cor,canvasId,wrapId) {
+  const canvas=document.getElementById(canvasId);if(!canvas)return;
+  const wrap=document.getElementById(wrapId),W=wrap.clientWidth,H=wrap.clientHeight;
+  canvas.style.width=W+'px';canvas.style.height=H+'px';canvas.width=W*devicePixelRatio;canvas.height=H*devicePixelRatio;
+  const ctx=canvas.getContext('2d');ctx.scale(devicePixelRatio,devicePixelRatio);
+  const kgs=dados.map(d=>d.kg),mn=Math.min(...kgs),mx=Math.max(...kgs),range=mx-mn||1;
+  const pad={top:12,right:12,bottom:28,left:36},w=W-pad.left-pad.right,h=H-pad.top-pad.bottom;
+  for(let i=0;i<=3;i++){const y=pad.top+(h/3)*i;ctx.strokeStyle='#2a2a2a';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+w,y);ctx.stroke();if(i===0||i===3){ctx.fillStyle='#64748b';ctx.font='9px Courier New';ctx.textAlign='right';ctx.fillText(Math.round((mx-(range/3)*i)*10)/10+'kg',pad.left-3,y+4);}}
+  const pts=dados.map((d,i)=>({x:pad.left+(dados.length>1?(w/(dados.length-1))*i:w/2),y:pad.top+h-((d.kg-mn)/range)*h}));
+  if(dados.length===1){ctx.beginPath();ctx.arc(pts[0].x,pts[0].y,4,0,Math.PI*2);ctx.fillStyle=cor;ctx.fill();return;}
+  const grad=ctx.createLinearGradient(0,pad.top,0,pad.top+h);grad.addColorStop(0,cor+'33');grad.addColorStop(1,cor+'00');
+  ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++){const mx2=(pts[i-1].x+pts[i].x)/2,my2=(pts[i-1].y+pts[i].y)/2;ctx.quadraticCurveTo(pts[i-1].x,pts[i-1].y,mx2,my2);}ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);ctx.lineTo(pts[pts.length-1].x,pad.top+h);ctx.lineTo(pts[0].x,pad.top+h);ctx.closePath();ctx.fillStyle=grad;ctx.fill();
+  ctx.beginPath();ctx.moveTo(pts[0].x,pts[0].y);for(let i=1;i<pts.length;i++){const mx2=(pts[i-1].x+pts[i].x)/2,my2=(pts[i-1].y+pts[i].y)/2;ctx.quadraticCurveTo(pts[i-1].x,pts[i-1].y,mx2,my2);}ctx.lineTo(pts[pts.length-1].x,pts[pts.length-1].y);ctx.strokeStyle=cor;ctx.lineWidth=2;ctx.stroke();
+  pts.forEach((p,i)=>{ctx.beginPath();ctx.arc(p.x,p.y,3,0,Math.PI*2);ctx.fillStyle=cor;ctx.fill();ctx.fillStyle='#64748b';ctx.font='8px Courier New';ctx.textAlign='center';const parts=dados[i].data.split('/');ctx.fillText(`${parts[0]}/${parts[1]}`,p.x,pad.top+h+18);});
+}
+</script>
+</body>
+</html>
