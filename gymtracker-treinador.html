@@ -68,6 +68,7 @@ body{font-family:-apple-system,'Inter',sans-serif;background:var(--bg);color:var
 .edit-input:focus{border-color:var(--accent)}
 .edit-nome{flex:1;min-width:80px}
 .edit-num{width:46px;text-align:center}
+.edit-reps{width:90px;text-align:center}
 .ex-edit-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)}
 .ex-edit-row:last-of-type{border-bottom:none}
 .btn-sm{padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text3);font-size:12px;cursor:pointer;font-family:inherit;transition:all 0.2s}
@@ -239,6 +240,26 @@ const PALETTE=[
 let treinoKeys = [];
 function getColor(k) { return PALETTE[treinoKeys.indexOf(k)%PALETTE.length]||PALETTE[0]; }
 
+// ── COMPAT: carga única → cargas por série ───────────────────────────────────
+function normalizarCargas(ex) {
+  const n = (ex.series && ex.series>0) ? ex.series : (Array.isArray(ex.cargas)?ex.cargas.length:1);
+  if (Array.isArray(ex.cargas)) {
+    const cargas = ex.cargas.slice(0,n); while(cargas.length<n) cargas.push('');
+    const concluidas = Array.isArray(ex.concluidas) ? ex.concluidas.slice(0,n) : cargas.map(v=>!!v && parseFloat(v)>0);
+    while(concluidas.length<n) concluidas.push(false);
+    return { cargas, concluidas };
+  }
+  if (ex.carga!==undefined && ex.carga!==null && ex.carga!=='') {
+    const v = parseFloat(ex.carga)||0;
+    return { cargas: Array(n).fill(v), concluidas: Array(n).fill(!!ex.done) };
+  }
+  return { cargas: Array(n).fill(''), concluidas: Array(n).fill(false) };
+}
+function maxCarga(cargas) {
+  const nums = cargas.map(v=>parseFloat(v)).filter(v=>!isNaN(v)&&v>0);
+  return nums.length ? Math.max(...nums) : null;
+}
+
 // ── STATE ────────────────────────────────────────────────────────────────────
 let treinos={}, historico=[];
 let histFiltro='TODOS', paginaAtual='treinos';
@@ -306,7 +327,7 @@ function renderTreinos() {
           <input class="edit-input edit-nome" value="${ex.nome}" onchange="treinos['${k}'].exercicios[${i}].nome=this.value">
           <input class="edit-input edit-num" type="number" min="1" value="${ex.series}" onchange="treinos['${k}'].exercicios[${i}].series=+this.value">
           <span style="color:var(--text3);font-size:12px">×</span>
-          <input class="edit-input edit-num" type="number" min="1" value="${ex.reps}" onchange="treinos['${k}'].exercicios[${i}].reps=+this.value">
+          <input class="edit-input edit-reps" type="text" value="${ex.reps}" onchange="treinos['${k}'].exercicios[${i}].reps=this.value">
           <button class="btn-sm danger" onclick="deleteExTr('${k}',${i})" title="Remover">✕</button>
         </div>
         <div style="padding:0 0 8px">
@@ -339,7 +360,7 @@ async function salvarExercicios(k) {
 }
 
 function addExTr(k) {
-  treinos[k].exercicios.push({nome:'Novo exercício',series:3,reps:12});
+  treinos[k].exercicios.push({nome:'Novo exercício',series:3,reps:'12'});
   renderTreinos(); document.getElementById(`tc-${k}`).classList.add('open');
 }
 
@@ -373,12 +394,14 @@ function renderHistorico() {
       </div>
       <div class="card-body" id="hb-${idx}">
         ${h.exercicios.map(ex=>{
-          const prev=encontrarCargaAnterior(h,ex.nome);
+          const {cargas}=normalizarCargas(ex);
+          const curMax=maxCarga(cargas), prevMax=encontrarCargaAnterior(h,ex.nome);
           let dHtml='';
-          if(ex.carga&&prev!==null){const d=parseFloat(ex.carga)-prev;if(d>0)dHtml=`<span class="td-up" style="font-size:11px">▲${d}kg</span>`;else if(d<0)dHtml=`<span class="td-down" style="font-size:11px">▼${Math.abs(d)}kg</span>`;}
+          if(curMax!==null&&prevMax!==null){const d=curMax-prevMax;if(d>0)dHtml=`<span class="td-up" style="font-size:11px">▲${d}kg</span>`;else if(d<0)dHtml=`<span class="td-down" style="font-size:11px">▼${Math.abs(d)}kg</span>`;}
+          const cargasHtml=cargas.map((v,s)=>(v!==''&&v!==null&&v!==undefined&&parseFloat(v)>0)?`<span class="hist-carga">S${s+1}: ${v}kg</span>`:'').join(' ');
           return `<div class="hist-ex-row">
             <div class="hist-ex-name">${ex.done?'✓ ':''}${ex.nome} <span style="color:var(--text3);font-weight:400;font-size:12px">${ex.series}×${ex.reps}</span></div>
-            <div class="hist-ex-detail">${ex.carga?`<span class="hist-carga">${ex.carga}kg</span>`:''} ${dHtml} ${ex.obs?`<span>${ex.obs}</span>`:''}</div>
+            <div class="hist-ex-detail">${cargasHtml} ${dHtml} ${ex.obs?`<span>${ex.obs}</span>`:''}</div>
           </div>`;
         }).join('')}
         ${h.laps?.length?`<div style="margin-top:10px;padding:8px;background:var(--surface2);border-radius:6px;font-family:'Courier New',monospace;font-size:11px;color:var(--text3)">${h.laps.map((l,i)=>`#${i+1}: ${fmt(l.total)} (Δ${fmt(l.delta)})`).join('  ·  ')}</div>`:''}
@@ -390,7 +413,11 @@ function renderHistorico() {
 function setHistFiltro(k){histFiltro=k;renderHistorico();}
 function encontrarCargaAnterior(hAtual,nomeEx){
   const idx=historico.indexOf(hAtual);
-  for(let i=idx+1;i<historico.length;i++){const h=historico[i];if(h.treino!==hAtual.treino)continue;const ex=h.exercicios.find(e=>e.nome===nomeEx);if(ex&&ex.carga&&parseFloat(ex.carga)>0)return parseFloat(ex.carga);}
+  for(let i=idx+1;i<historico.length;i++){
+    const h=historico[i]; if(h.treino!==hAtual.treino)continue;
+    const ex=h.exercicios.find(e=>e.nome===nomeEx);
+    if(ex){const {cargas}=normalizarCargas(ex);const m=maxCarga(cargas);if(m!==null)return m;}
+  }
   return null;
 }
 
@@ -404,10 +431,12 @@ function renderEvolucao() {
   for(let i=historico.length-1;i>=0;i--){
     const h=historico[i];
     h.exercicios.forEach(ex=>{
-      if(!ex.carga||parseFloat(ex.carga)<=0) return;
+      const {cargas}=normalizarCargas(ex);
+      const m=maxCarga(cargas);
+      if(m===null) return;
       const key=`${h.treino}::${ex.nome}`;
       if(!mapa[key]) mapa[key]={treino:h.treino,nome:ex.nome,dados:[]};
-      mapa[key].dados.push({data:h.data,kg:parseFloat(ex.carga)});
+      mapa[key].dados.push({data:h.data,kg:m});
     });
   }
 

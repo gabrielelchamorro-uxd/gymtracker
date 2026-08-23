@@ -85,8 +85,11 @@ body{font-family:-apple-system,'Inter',sans-serif;background:var(--bg);color:var
 .ex-body{display:none;padding:0 16px 14px;border-top:1px solid var(--border)}
 .ex-body.open{display:block}
 .series-chips{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
-.serie-chip{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text3);font-size:13px;font-weight:700;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;font-family:inherit}
+.serie-chip{width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text3);font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;font-family:inherit;flex-shrink:0}
 .serie-chip.on{background:var(--accent);border-color:var(--accent);color:#000}
+.series-rows{display:flex;flex-direction:column;gap:8px;margin:12px 0}
+.serie-row{display:flex;align-items:center;gap:10px}
+.serie-input{flex:1;min-width:0}
 .ex-inputs{display:flex;gap:10px}
 .ex-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:13px;padding:9px 12px;outline:none;transition:border-color 0.2s;font-family:inherit}
 .ex-input:focus{border-color:var(--accent)}
@@ -359,6 +362,26 @@ function getColor(k) {
   return PALETTE[keys.indexOf(k) % PALETTE.length] || PALETTE[0];
 }
 
+// ── COMPAT: carga única → cargas por série ───────────────────────────────────
+function normalizarCargas(ex) {
+  const n = (ex.series && ex.series>0) ? ex.series : (Array.isArray(ex.cargas)?ex.cargas.length:1);
+  if (Array.isArray(ex.cargas)) {
+    const cargas = ex.cargas.slice(0,n); while(cargas.length<n) cargas.push('');
+    const concluidas = Array.isArray(ex.concluidas) ? ex.concluidas.slice(0,n) : cargas.map(v=>!!v && parseFloat(v)>0);
+    while(concluidas.length<n) concluidas.push(false);
+    return { cargas, concluidas };
+  }
+  if (ex.carga!==undefined && ex.carga!==null && ex.carga!=='') {
+    const v = parseFloat(ex.carga)||0;
+    return { cargas: Array(n).fill(v), concluidas: Array(n).fill(!!ex.done) };
+  }
+  return { cargas: Array(n).fill(''), concluidas: Array(n).fill(false) };
+}
+function maxCarga(cargas) {
+  const nums = cargas.map(v=>parseFloat(v)).filter(v=>!isNaN(v)&&v>0);
+  return nums.length ? Math.max(...nums) : null;
+}
+
 // ── STATE ────────────────────────────────────────────────────────────────────
 let treinos   = {};
 let historico = [];
@@ -477,7 +500,7 @@ function cargaAnterior(treinoKey, nomeEx) {
   for (const h of historico) {
     if (h.treino !== treinoKey) continue;
     const ex = h.exercicios.find(e => e.nome===nomeEx);
-    if (ex && ex.carga && parseFloat(ex.carga)>0) return parseFloat(ex.carga);
+    if (ex) { const {cargas}=normalizarCargas(ex); const m=maxCarga(cargas); if(m!==null) return m; }
   }
   return null;
 }
@@ -506,7 +529,7 @@ function renderSelecao() {
 function iniciarTreino(k) {
   sessao = { key:k, ativo:true, pausado:false, segundos:0, laps:[], ultimoLap:0, exercicios:{} };
   timerAccum = 0;
-  treinos[k].exercicios.forEach((_,i) => { sessao.exercicios[i]={done:false,seriesDone:[],carga:'',obs:''}; });
+  treinos[k].exercicios.forEach((ex,i) => { sessao.exercicios[i]={done:false,seriesDone:[],cargas:Array(ex.series||1).fill(''),obs:''}; });
   const c = getColor(k);
   document.getElementById('ativoBadge').style.background=c.bg;
   document.getElementById('ativoBadge').style.color=c.color;
@@ -526,10 +549,16 @@ function renderExercicios() {
   const k=sessao.key, exs=treinos[k].exercicios;
   document.getElementById('exList').innerHTML = exs.map((ex,i) => {
     const st=sessao.exercicios[i];
+    if(!Array.isArray(st.cargas)) st.cargas=Array(ex.series||1).fill('');
     const prev=cargaAnterior(k,ex.nome);
-    const chips=Array.from({length:ex.series},(_,s)=>
-      `<button class="serie-chip ${st.seriesDone.includes(s)?'on':''}" onclick="toggleSerie(${i},${s})">${s+1}</button>`
-    ).join('');
+    const serieRows=Array.from({length:ex.series},(_,s)=>{
+      const done=st.seriesDone.includes(s);
+      const val=st.cargas[s]!==undefined&&st.cargas[s]!==null?st.cargas[s]:'';
+      return `<div class="serie-row">
+        <button class="serie-chip ${done?'on':''}" onclick="toggleSerie(${i},${s})">S${s+1}</button>
+        <input class="ex-input serie-input" type="number" placeholder="kg" value="${val}" onchange="setCargaSerie(${i},${s},this.value)" min="0" step="0.5">
+      </div>`;
+    }).join('');
     return `<div class="ex-card ${st.done?'concluido':''}" id="excard-${i}">
       <div class="ex-header" onclick="toggleExBody(${i})">
         <button class="ex-check ${st.done?'on':''}" onclick="event.stopPropagation();toggleExDone(${i})">${st.done?'✓':''}</button>
@@ -541,10 +570,9 @@ function renderExercicios() {
       </div>
       <div class="ex-body" id="exbody-${i}">
         ${ex.instrucoes?`<div style="margin:10px 0 4px;padding:8px 10px;background:var(--surface2);border-left:3px solid var(--accent);border-radius:0 6px 6px 0;font-size:12px;color:var(--text2);line-height:1.5">${ex.instrucoes}</div>`:''}
-        <div class="series-chips">${chips}</div>
+        <div class="series-rows">${serieRows}</div>
         <div class="ex-inputs">
-          <input class="ex-input" type="number" placeholder="Carga (kg)" value="${st.carga}" onchange="sessao.exercicios[${i}].carga=this.value" min="0" step="0.5">
-          <input class="ex-input" placeholder="Observação..." value="${st.obs}" onchange="sessao.exercicios[${i}].obs=this.value">
+          <input class="ex-input" placeholder="Observação..." value="${st.obs}" onchange="sessao.exercicios[${i}].obs=this.value" style="width:100%">
         </div>
       </div>
     </div>`;
@@ -558,6 +586,11 @@ function toggleSerie(i,s) {
   renderExercicios(); document.getElementById(`exbody-${i}`).classList.add('open'); resetInatividade();
 }
 function toggleExDone(i) { sessao.exercicios[i].done=!sessao.exercicios[i].done; renderExercicios(); }
+function setCargaSerie(i,s,val) {
+  if(!Array.isArray(sessao.exercicios[i].cargas)) sessao.exercicios[i].cargas=[];
+  sessao.exercicios[i].cargas[s]=val;
+  resetInatividade();
+}
 
 // ── MARCAR / DESCANSO ────────────────────────────────────────────────────────
 function marcarSerie() {
@@ -631,12 +664,18 @@ async function _salvar() {
     data: new Date().toLocaleDateString('pt-BR'),
     treino: sessao.key, nomeT: treinos[sessao.key].nome,
     duracao: sessao.segundos, laps: sessao.laps,
-    exercicios: exs.map((ex,i)=>({
-      nome:ex.nome, series:ex.series, reps:ex.reps,
-      done:sessao.exercicios[i]?.done||false,
-      carga:sessao.exercicios[i]?.carga||'',
-      obs:sessao.exercicios[i]?.obs||''
-    }))
+    exercicios: exs.map((ex,i)=>{
+      const st=sessao.exercicios[i]||{};
+      const cargas=(Array.isArray(st.cargas)?st.cargas:[]).slice(0,ex.series);
+      while(cargas.length<ex.series) cargas.push('');
+      const concluidas=Array.from({length:ex.series},(_,s)=>(st.seriesDone||[]).includes(s));
+      return {
+        nome:ex.nome, series:ex.series, reps:ex.reps,
+        done:st.done||false,
+        cargas, concluidas,
+        obs:st.obs||''
+      };
+    })
   };
   historico.unshift(registro);
   await salvarHistoricoRemoto(registro);
@@ -760,7 +799,7 @@ function renderHistorico() {
   if(!lista.length){el.innerHTML=`<div class="empty-state"><p>Sem registros para este treino.</p></div>`;return;}
   el.innerHTML=lista.map(h=>{
     const idx=historico.indexOf(h), c=getColor(h.treino);
-    const comCarga=h.exercicios.filter(e=>e.carga&&parseFloat(e.carga)>0);
+    const comCarga=h.exercicios.filter(e=>{const {cargas}=normalizarCargas(e);return maxCarga(cargas)!==null;});
     return `<div class="hist-card">
       <div class="hist-card-header" onclick="toggleHistBody(${idx})">
         <div class="hist-card-left">
@@ -771,12 +810,14 @@ function renderHistorico() {
       </div>
       <div class="hist-body" id="hbody-${idx}">
         ${h.exercicios.map(ex=>{
-          const prev=encontrarCargaAnterior(h,ex.nome);
+          const {cargas}=normalizarCargas(ex);
+          const curMax=maxCarga(cargas), prevMax=encontrarCargaAnterior(h,ex.nome);
           let dHtml='';
-          if(ex.carga&&prev!==null){const d=parseFloat(ex.carga)-prev;if(d>0)dHtml=`<span style="color:#22c55e;font-size:11px">▲${d}kg</span>`;else if(d<0)dHtml=`<span style="color:var(--danger);font-size:11px">▼${Math.abs(d)}kg</span>`;}
+          if(curMax!==null&&prevMax!==null){const d=curMax-prevMax;if(d>0)dHtml=`<span style="color:#22c55e;font-size:11px">▲${d}kg</span>`;else if(d<0)dHtml=`<span style="color:var(--danger);font-size:11px">▼${Math.abs(d)}kg</span>`;}
+          const cargasHtml=cargas.map((v,s)=>(v!==''&&v!==null&&v!==undefined&&parseFloat(v)>0)?`<span class="hist-carga">S${s+1}: ${v}kg</span>`:'').join(' ');
           return `<div class="hist-ex-row">
             <div class="hist-ex-name">${ex.done?'✓ ':''}${ex.nome}</div>
-            <div class="hist-ex-detail">${ex.carga?`<span class="hist-carga">${ex.carga}kg</span>`:''} ${dHtml} ${ex.obs?`<span>${ex.obs}</span>`:''}</div>
+            <div class="hist-ex-detail">${cargasHtml} ${dHtml} ${ex.obs?`<span>${ex.obs}</span>`:''}</div>
           </div>`;
         }).join('')}
         <div class="hist-btn-row">
@@ -789,7 +830,11 @@ function renderHistorico() {
 }
 function encontrarCargaAnterior(hAtual,nomeEx) {
   const idx=historico.indexOf(hAtual);
-  for(let i=idx+1;i<historico.length;i++){const h=historico[i];if(h.treino!==hAtual.treino)continue;const ex=h.exercicios.find(e=>e.nome===nomeEx);if(ex&&ex.carga&&parseFloat(ex.carga)>0)return parseFloat(ex.carga);}
+  for(let i=idx+1;i<historico.length;i++){
+    const h=historico[i]; if(h.treino!==hAtual.treino)continue;
+    const ex=h.exercicios.find(e=>e.nome===nomeEx);
+    if(ex){const {cargas}=normalizarCargas(ex);const m=maxCarga(cargas);if(m!==null)return m;}
+  }
   return null;
 }
 function esc(s){return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}
@@ -804,7 +849,11 @@ async function deletarHist(i) {
 // ── GRÁFICO ──────────────────────────────────────────────────────────────────
 function abrirChart(nomeEx,treinoKey) {
   const dados=[];
-  for(let i=historico.length-1;i>=0;i--){const h=historico[i];if(h.treino!==treinoKey)continue;const ex=h.exercicios.find(e=>e.nome===nomeEx);if(ex&&ex.carga&&parseFloat(ex.carga)>0)dados.push({data:h.data,kg:parseFloat(ex.carga),obs:ex.obs||''});}
+  for(let i=historico.length-1;i>=0;i--){
+    const h=historico[i];if(h.treino!==treinoKey)continue;
+    const ex=h.exercicios.find(e=>e.nome===nomeEx);
+    if(ex){const {cargas}=normalizarCargas(ex);const m=maxCarga(cargas);if(m!==null)dados.push({data:h.data,kg:m,obs:ex.obs||''});}
+  }
   document.getElementById('chartTitle').textContent=nomeEx;
   document.getElementById('chartSub').textContent=`Treino ${treinoKey} · ${dados.length} registro${dados.length!==1?'s':''}`;
   document.getElementById('modalChart').classList.add('open');
