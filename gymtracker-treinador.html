@@ -68,6 +68,7 @@ body{font-family:-apple-system,'Inter',sans-serif;background:var(--bg);color:var
 .edit-input:focus{border-color:var(--accent)}
 .edit-nome{flex:1;min-width:80px}
 .edit-num{width:46px;text-align:center}
+.edit-reps{width:90px;text-align:center}
 .ex-edit-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)}
 .ex-edit-row:last-of-type{border-bottom:none}
 .btn-sm{padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text3);font-size:12px;cursor:pointer;font-family:inherit;transition:all 0.2s}
@@ -326,7 +327,7 @@ function renderTreinos() {
           <input class="edit-input edit-nome" value="${ex.nome}" onchange="treinos['${k}'].exercicios[${i}].nome=this.value">
           <input class="edit-input edit-num" type="number" min="1" value="${ex.series}" onchange="treinos['${k}'].exercicios[${i}].series=+this.value">
           <span style="color:var(--text3);font-size:12px">×</span>
-          <input class="edit-input edit-num" type="text" value="${ex.reps}" onchange="treinos['${k}'].exercicios[${i}].reps=this.value">
+          <input class="edit-input edit-reps" type="text" value="${ex.reps}" onchange="treinos['${k}'].exercicios[${i}].reps=this.value">
           <button class="btn-sm danger" onclick="deleteExTr('${k}',${i})" title="Remover">✕</button>
         </div>
         <div style="padding:0 0 8px">
@@ -359,7 +360,7 @@ async function salvarExercicios(k) {
 }
 
 function addExTr(k) {
-  treinos[k].exercicios.push({nome:'Novo exercício',series:3,reps:12});
+  treinos[k].exercicios.push({nome:'Novo exercício',series:3,reps:'12'});
   renderTreinos(); document.getElementById(`tc-${k}`).classList.add('open');
 }
 
